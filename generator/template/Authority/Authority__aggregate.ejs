@@ -1,0 +1,29 @@
+<template>
+    <name>Authority__aggregate</name>
+    <parameter>a_t id</parameter>
+    <location id="id33" x="0" y="0">
+    </location>
+    <init ref="id33"/>
+    <transition>
+        <source ref="id33"/>
+        <target ref="id33"/>
+        <label kind="select" x="-102" y="110">i:v_t</label>
+        <label kind="guard" x="-102" y="127">eligible[i]==1 &amp;&amp; 
+recorded[i]==0 &amp;&amp;
+dispatched[i]==1</label>
+        <label kind="synchronisation" x="-102" y="178">cast[i][id]?</label>
+        <nail x="-102" y="0"/>
+        <nail x="-102" y="102"/>
+        <nail x="0" y="102"/>
+    </transition>
+    <transition>
+        <source ref="id33"/>
+        <target ref="id33"/>
+        <label kind="select" x="0" y="-161">i:ep_t</label>
+        <label kind="guard" x="0" y="-144">owner[i]==addrOf[id]</label>
+        <label kind="assignment" x="-1" y="-127">owner[i]=id</label>
+        <nail x="102" y="0"/>
+        <nail x="102" y="-102"/>
+        <nail x="0" y="-102"/>
+    </transition>
+</template>

@@ -1,0 +1,49 @@
+<template>
+    <name>Authority__prepare</name>
+    <parameter>a_t id</parameter>
+    <location id="id31" x="136" y="0">
+    </location>
+    <init ref="id31"/>
+    <transition>
+        <source ref="id31"/>
+        <target ref="id31"/>
+        <label kind="select" x="314" y="34">i:if_t</label>
+        <label kind="guard" x="314" y="51">if_chk[i]==0</label>
+        <label kind="synchronisation" x="314" y="68">info[id][i]?</label>
+        <label kind="assignment" x="314" y="85">if_chk[i]=1,
+dqueue[sh[0]]=(sh[0]&gt;0 &amp;&amp; eligible[sh[0]] &amp;&amp; !dispatched[sh[0]] &amp;&amp; sh[2]==id) ? sh[1] : 0,
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+        <label kind="comments" x="170" y="59">for valid IF
+enqueue 
+delivery of EP</label>
+        <nail x="136" y="170"/>
+        <nail x="306" y="170"/>
+        <nail x="306" y="0"/>
+    </transition>
+    <transition>
+        <source ref="id31"/>
+        <target ref="id31"/>
+        <label kind="select" x="35" y="-76">i:ep_t</label>
+        <label kind="guard" x="35" y="-59">owner[i]==0</label>
+        <label kind="assignment" x="34" y="-42">owner[i]=id,
+ep_stmp[i]=0</label>
+        <label kind="comments" x="51" y="51">invalid EP</label>
+        <nail x="136" y="102"/>
+        <nail x="34" y="102"/>
+        <nail x="34" y="0"/>
+    </transition>
+    <transition>
+        <source ref="id31"/>
+        <target ref="id31"/>
+        <label kind="select" x="246" y="-102">i:ep_t</label>
+        <label kind="guard" x="246" y="-85">owner[i]==0</label>
+        <label kind="assignment" x="246" y="-68">owner[i]=id,
+ep_stmp[i]=1</label>
+        <label kind="comments" x="161" y="-59">valid EP</label>
+        <nail x="136" y="-102"/>
+        <nail x="238" y="-102"/>
+        <nail x="238" y="0"/>
+    </transition>
+</template>

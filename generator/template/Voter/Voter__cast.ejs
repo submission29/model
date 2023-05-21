@@ -1,0 +1,87 @@
+<%_ var withRec = false _%>
+<template>
+    <name>Voter__cast</name>
+    <parameter>v_t id</parameter>
+    <declaration>const int[0,1] RECCURRING=<%= withRec ? 1 : 0 %>;</declaration>
+    <location id="id22" x="-34" y="-170">
+    </location>
+    <location id="id23" x="204" y="-136">
+    </location>
+    <location id="id24" x="204" y="34">
+    </location>
+    <location id="id25" x="442" y="68">
+    </location>
+    <init ref="id22"/>
+    <transition>
+        <source ref="id24"/>
+        <target ref="id22"/>
+        <label kind="guard" x="0" y="76">RECCURRING</label>
+        <label kind="synchronisation" x="0" y="93">exitCast[id]!</label>
+        <nail x="204" y="68"/>
+        <nail x="-34" y="68"/>
+    </transition>
+    <transition>
+        <source ref="id23"/>
+        <target ref="id24"/>
+        <label kind="select" x="143" y="-85">i:ep_t,
+j:a_t</label>
+        <label kind="guard" x="144" y="-51">owner[i]==id &amp;&amp; 
+envTo[i]==j</label>
+        <label kind="synchronisation" x="145" y="-17">cast[id][j]!</label>
+        <label kind="assignment" x="144" y="0">owner[i]=j</label>
+        <label kind="comments" x="144" y="-127">sync
+(MO)</label>
+        <nail x="135" y="-136"/>
+        <nail x="135" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id23"/>
+        <target ref="id24"/>
+        <label kind="select" x="416" y="-85">i:ep_t</label>
+        <label kind="guard" x="416" y="-68">owner[i]==id &amp;&amp;
+envTo[i]&lt;0</label>
+        <label kind="assignment" x="416" y="-34">owner[i]=envTo[i]</label>
+        <label kind="comments" x="416" y="-127">async 
+(DST postbox)</label>
+        <nail x="408" y="-136"/>
+        <nail x="408" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id23"/>
+        <target ref="id24"/>
+        <label kind="select" x="280" y="-85">i:ep_t,
+j:po_t</label>
+        <label kind="guard" x="280" y="-51">owner[i]==id</label>
+        <label kind="assignment" x="279" y="-34">owner[i]=j</label>
+        <label kind="comments" x="280" y="-127">async 
+(PO postbox)</label>
+        <nail x="272" y="-136"/>
+        <nail x="272" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id24"/>
+        <target ref="id25"/>
+        <label kind="guard" x="238" y="76">!RECCURRING</label>
+        <label kind="synchronisation" x="238" y="93">exitCast[id]!</label>
+        <nail x="204" y="68"/>
+    </transition>
+    <transition>
+        <source ref="id23"/>
+        <target ref="id24"/>
+        <label kind="select" x="7" y="-85">i:ep_t,
+j:po_t</label>
+        <label kind="guard" x="8" y="-51">owner[i]==id</label>
+        <label kind="synchronisation" x="8" y="-34">postSnd[j]!</label>
+        <label kind="assignment" x="8" y="-17">owner[i]=j</label>
+        <label kind="comments" x="8" y="-127">sync 
+(PO)</label>
+        <nail x="-1" y="-136"/>
+        <nail x="-1" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id22"/>
+        <target ref="id23"/>
+        <label kind="synchronisation" x="34" y="-195">enterCast[id]?</label>
+        <nail x="204" y="-170"/>
+    </transition>
+</template>

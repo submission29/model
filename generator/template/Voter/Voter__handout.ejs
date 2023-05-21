@@ -1,0 +1,58 @@
+<%_ var withRec = false _%>
+<template>
+    <name>Voter__handout</name>
+    <parameter>v_t id</parameter>
+    <declaration>const int RECCURRING = <%= withRec ? 1 : 0 %>;</declaration>
+    <location id="id26" x="221" y="-153">
+    </location>
+    <location id="id27" x="136" y="0">
+    </location>
+    <location id="id28" x="306" y="0">
+    </location>
+    <location id="id29" x="221" y="153">
+    </location>
+    <init ref="id26"/>
+    <transition>
+        <source ref="id27"/>
+        <target ref="id28"/>
+        <label kind="select" x="178" y="-110">i:ep_t,
+j:addr_t</label>
+        <label kind="guard" x="178" y="-77">owner[i]==id</label>
+        <label kind="assignment" x="178" y="-60">owner[i]=j</label>
+        <label kind="comments" x="178" y="-34">async</label>
+        <nail x="170" y="-43"/>
+        <nail x="272" y="-43"/>
+    </transition>
+    <transition>
+        <source ref="id28"/>
+        <target ref="id26"/>
+        <label kind="guard" x="238" y="-195">RECCURRING</label>
+        <label kind="synchronisation" x="238" y="-178">exitHandout[id]!</label>
+        <nail x="306" y="-153"/>
+    </transition>
+    <transition>
+        <source ref="id27"/>
+        <target ref="id28"/>
+        <label kind="select" x="178" y="43">i:ep_t,
+j:aid_t</label>
+        <label kind="guard" x="178" y="77">owner[i]==id</label>
+        <label kind="synchronisation" x="178" y="94">pass[j]!</label>
+        <label kind="assignment" x="178" y="111">owner[i]=j</label>
+        <label kind="comments" x="178" y="17">sync</label>
+        <nail x="170" y="43"/>
+        <nail x="272" y="43"/>
+    </transition>
+    <transition>
+        <source ref="id28"/>
+        <target ref="id29"/>
+        <label kind="guard" x="238" y="161">!RECCURRING</label>
+        <label kind="synchronisation" x="238" y="178">exitHandout[id]!</label>
+        <nail x="306" y="153"/>
+    </transition>
+    <transition>
+        <source ref="id26"/>
+        <target ref="id27"/>
+        <label kind="synchronisation" x="76" y="-178">enterHandout[id]?</label>
+        <nail x="136" y="-153"/>
+    </transition>
+</template>

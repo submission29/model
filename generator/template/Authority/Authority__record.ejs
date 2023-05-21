@@ -1,0 +1,68 @@
+<template>
+    <name>Authority__record</name>
+    <parameter>a_t id</parameter>
+    <location id="id34" x="-340" y="-204">
+    </location>
+    <init ref="id34"/>
+    <transition>
+        <source ref="id34"/>
+        <target ref="id34"/>
+        <label kind="select" x="-229" y="-102">i:ep_t</label>
+        <label kind="guard" x="-229" y="-85">openBE[i]==1 &amp;&amp;
+procBE[i]==0</label>
+        <label kind="synchronisation" x="-229" y="-51">info[id][i]?</label>
+        <label kind="assignment" x="-229" y="-34">procBE[i]=1,
+tally[sh[2]] = (sh[2]&gt;0) ? (tally[sh[2]]+sh[0]) : tally[sh[2]],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+        <label kind="comments" x="-297" y="-161">4</label>
+        <nail x="-340" y="-102"/>
+        <nail x="-238" y="-102"/>
+        <nail x="-238" y="-204"/>
+    </transition>
+    <transition>
+        <source ref="id34"/>
+        <target ref="id34"/>
+        <label kind="select" x="-229" y="-374">i:ep_t</label>
+        <label kind="guard" x="-229" y="-357">openRE[i]==1 &amp;&amp; 
+procRE[i]==0</label>
+        <label kind="synchronisation" x="-229" y="-323">info[id][i]?</label>
+        <label kind="assignment" x="-229" y="-306">procRE[i]=1,
+inBox[i]=eligible[sh[1]] &amp;&amp; !recorded[sh[1]],
+(sh[1]&gt;0) ? (recorded[sh[1]]=1) : 0,
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+        <label kind="comments" x="-297" y="-263">2</label>
+        <nail x="-340" y="-306"/>
+        <nail x="-238" y="-306"/>
+        <nail x="-238" y="-204"/>
+    </transition>
+    <transition>
+        <source ref="id34"/>
+        <target ref="id34"/>
+        <label kind="select" x="-544" y="-102">i:ep_t</label>
+        <label kind="guard" x="-544" y="-85">inBox[i]==1 &amp;&amp;
+openBE[i]==0</label>
+        <label kind="synchronisation" x="-543" y="-51">sealOp[id][i][1]!</label>
+        <label kind="assignment" x="-543" y="-34">openBE[i]=1,
+inBox[i]=0</label>
+        <label kind="comments" x="-399" y="-161">3</label>
+        <nail x="-340" y="-102"/>
+        <nail x="-442" y="-102"/>
+        <nail x="-442" y="-204"/>
+    </transition>
+    <transition>
+        <source ref="id34"/>
+        <target ref="id34"/>
+        <label kind="select" x="-545" y="-374">i:ep_t</label>
+        <label kind="guard" x="-544" y="-357">openRE[i]==0</label>
+        <label kind="synchronisation" x="-544" y="-340">sealOp[id][i][1]!</label>
+        <label kind="assignment" x="-544" y="-323">openRE[i]=1</label>
+        <label kind="comments" x="-399" y="-263">1</label>
+        <nail x="-340" y="-306"/>
+        <nail x="-442" y="-306"/>
+        <nail x="-442" y="-204"/>
+    </transition>
+</template>

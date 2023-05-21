@@ -1,0 +1,46 @@
+<template>
+    <name>PostOffice__deliver</name>
+    <parameter>po_t id</parameter>
+    <location id="id36" x="-34" y="0">
+    </location>
+    <init ref="id36"/>
+    <transition>
+        <source ref="id36"/>
+        <target ref="id36"/>
+        <label kind="select" x="42" y="-102">i:oid_t</label>
+        <label kind="guard" x="42" y="-85">owner[i]==id &amp;&amp; 
+envTo[i]&gt;0</label>
+        <label kind="assignment" x="42" y="-51">owner[i]=addrOf[envTo[i]],
+envTo[i]=0</label>
+        <nail x="34" y="0"/>
+        <nail x="34" y="-68"/>
+        <nail x="-34" y="-68"/>
+    </transition>
+    <transition>
+        <source ref="id36"/>
+        <target ref="id36"/>
+        <label kind="select" x="42" y="8">i:oid_t</label>
+        <label kind="guard" x="42" y="25">owner[i]==id &amp;&amp; 
+envTo[i]&gt;0</label>
+        <label kind="synchronisation" x="42" y="59">postRcv[envTo[i]]!</label>
+        <label kind="assignment" x="42" y="76">owner[i]=envTo[i],
+envTo[i]=0</label>
+        <label kind="comments" x="-59" y="76">hand in</label>
+        <nail x="34" y="0"/>
+        <nail x="34" y="68"/>
+        <nail x="-34" y="68"/>
+    </transition>
+    <transition>
+        <source ref="id36"/>
+        <target ref="id36"/>
+        <label kind="select" x="-236" y="-102">i:oid_t</label>
+        <label kind="guard" x="-237" y="-85">owner[i]==id &amp;&amp; 
+envTo[i]&lt;0</label>
+        <label kind="assignment" x="-238" y="-51">owner[i]=envTo[i],
+envTo[i]=0</label>
+        <label kind="comments" x="-93" y="-93">leave in postbox</label>
+        <nail x="-102" y="0"/>
+        <nail x="-102" y="-68"/>
+        <nail x="-34" y="-68"/>
+    </transition>
+</template>

@@ -1,0 +1,121 @@
+<template>
+    <name>ElectionPackage</name>
+    <parameter>ep_t id</parameter>
+    <declaration>int[0,1] rintact=1, bintact=1;</declaration>
+    <location id="id39" x="-272" y="-102">
+        <name x="-263" y="-93">nseal</name>
+    </location>
+    <location id="id40" x="0" y="170">
+        <name x="8" y="178">rseal</name>
+    </location>
+    <location id="id41" x="-136" y="34">
+        <name x="-127" y="42">bseal</name>
+    </location>
+    <init ref="id39"/>
+    <transition>
+        <source ref="id40"/>
+        <target ref="id40"/>
+        <label kind="select" x="76" y="170">i:aid_t</label>
+        <label kind="guard" x="76" y="187">owner[id]==i</label>
+        <label kind="synchronisation" x="76" y="204">info[i][id]!</label>
+        <label kind="assignment" x="76" y="221">sh[0]=-1,
+sh[1]=-1,
+sh[2]=-2</label>
+        <nail x="0" y="238"/>
+        <nail x="68" y="238"/>
+        <nail x="68" y="170"/>
+    </transition>
+    <transition>
+        <source ref="id41"/>
+        <target ref="id41"/>
+        <label kind="select" x="-297" y="102">i: aid_t</label>
+        <label kind="guard" x="-297" y="119">owner[id]==i</label>
+        <label kind="synchronisation" x="-297" y="136">info[i][id]!</label>
+        <label kind="assignment" x="-297" y="153">sh[0] = -1,
+sh[1] = ep_sgn[id],
+sh[2] = -1</label>
+        <nail x="-204" y="34"/>
+        <nail x="-204" y="102"/>
+        <nail x="-136" y="102"/>
+    </transition>
+    <transition>
+        <source ref="id41"/>
+        <target ref="id41"/>
+        <label kind="select" x="-59" y="-85">i: aid_t</label>
+        <label kind="guard" x="-59" y="-68">owner[id]==i</label>
+        <label kind="synchronisation" x="-59" y="-51">fill[i][id]?</label>
+        <label kind="assignment" x="-59" y="-34">ep_sgn[id] = ep_sgn[id] ? ep_sgn[id] : sh[1],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+        <nail x="-68" y="34"/>
+        <nail x="-68" y="-34"/>
+        <nail x="-136" y="-34"/>
+    </transition>
+    <transition>
+        <source ref="id39"/>
+        <target ref="id39"/>
+        <label kind="select" x="-484" y="-136">i: aid_t</label>
+        <label kind="guard" x="-484" y="-119">owner[id]==i</label>
+        <label kind="synchronisation" x="-484" y="-102">info[i][id]!</label>
+        <label kind="assignment" x="-484" y="-85">sh[0] = ep_stmp[id],
+sh[1] = ep_sgn[id],
+sh[2] = ep_x[id]</label>
+        <nail x="-340" y="-102"/>
+        <nail x="-340" y="-34"/>
+        <nail x="-272" y="-34"/>
+    </transition>
+    <transition>
+        <source ref="id39"/>
+        <target ref="id39"/>
+        <label kind="select" x="-340" y="-263">i: aid_t</label>
+        <label kind="guard" x="-340" y="-246">owner[id]==i</label>
+        <label kind="synchronisation" x="-340" y="-229">fill[i][id]?</label>
+        <label kind="assignment" x="-340" y="-212">ep_sgn[id] = ep_sgn[id] ? ep_sgn[id] : sh[1],
+ep_x[id] =  (ep_x[id]&gt;0 || ep_x[id]==-1) ? -1 : sh[2],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+        <nail x="-204" y="-102"/>
+        <nail x="-204" y="-170"/>
+        <nail x="-272" y="-170"/>
+    </transition>
+    <transition>
+        <source ref="id41"/>
+        <target ref="id39"/>
+        <label kind="select" x="-374" y="-9">i: aid_t,
+rip:int[0,1]</label>
+        <label kind="guard" x="-374" y="25">owner[id]==i</label>
+        <label kind="synchronisation" x="-374" y="42">sealOp[i][id][rip]?</label>
+        <label kind="assignment" x="-374" y="59">bintact=!rip</label>
+        <nail x="-272" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id40"/>
+        <target ref="id41"/>
+        <label kind="select" x="-136" y="178">i: aid_t,
+rip:int[0,1]</label>
+        <label kind="guard" x="-136" y="212">owner[id]==i</label>
+        <label kind="synchronisation" x="-136" y="229">sealOp[i][id][rip]?</label>
+        <label kind="assignment" x="-136" y="246">rintact=!rip</label>
+        <nail x="-136" y="170"/>
+    </transition>
+    <transition>
+        <source ref="id41"/>
+        <target ref="id40"/>
+        <label kind="select" x="8" y="34">i: aid_t</label>
+        <label kind="guard" x="8" y="51">rintact &amp;&amp;
+owner[id]==i</label>
+        <label kind="synchronisation" x="8" y="85">sealOp[i][id][2]?</label>
+        <nail x="0" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id39"/>
+        <target ref="id41"/>
+        <label kind="select" x="-136" y="-170">i: aid_t</label>
+        <label kind="guard" x="-136" y="-153">bintact &amp;&amp;
+owner[id]==i</label>
+        <label kind="synchronisation" x="-136" y="-119">sealOp[i][id][2]?</label>
+        <nail x="-136" y="-102"/>
+    </transition>
+</template>

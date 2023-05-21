@@ -1,0 +1,29 @@
+<template>
+    <name>PostOffice__accept</name>
+    <parameter>po_t id</parameter>
+    <location id="id35" x="0" y="0">
+    </location>
+    <init ref="id35"/>
+    <transition>
+        <source ref="id35"/>
+        <target ref="id35"/>
+        <label kind="select" x="0" y="110">i:oid_t</label>
+        <label kind="guard" x="0" y="127">owner[i]==addrOf[id]</label>
+        <label kind="assignment" x="-1" y="144">owner[i]=id</label>
+        <label kind="comments" x="17" y="34">async
+postbox</label>
+        <nail x="0" y="102"/>
+        <nail x="102" y="102"/>
+        <nail x="102" y="0"/>
+    </transition>
+    <transition>
+        <source ref="id35"/>
+        <target ref="id35"/>
+        <label kind="synchronisation" x="-102" y="-127">postSnd[id]?</label>
+        <label kind="comments" x="-85" y="-68">sync
+hand in</label>
+        <nail x="0" y="-102"/>
+        <nail x="-102" y="-102"/>
+        <nail x="-102" y="0"/>
+    </transition>
+</template>

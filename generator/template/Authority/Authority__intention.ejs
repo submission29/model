@@ -1,0 +1,40 @@
+<template>
+        <name>Authority__intention</name>
+        <parameter>a_t id</parameter>
+        <location id="id30" x="0" y="0">
+        </location>
+        <init ref="id30"/>
+        <transition>
+                <source ref="id30"/>
+                <target ref="id30"/>
+                <label kind="select" x="9" y="-102">i:if_t</label>
+                <label kind="guard" x="9" y="-85">owner[i]==addrOf[id]</label>
+                <label kind="assignment" x="8" y="-68">owner[i]=id</label>
+                <label kind="comments" x="-85" y="-68">async
+(postbox)</label>
+                <nail x="0" y="-102"/>
+                <nail x="-102" y="-102"/>
+                <nail x="-102" y="0"/>
+        </transition>
+        <transition>
+                <source ref="id30"/>
+                <target ref="id30"/>
+                <label kind="synchronisation" x="-102" y="110">postRcv[id]?</label>
+                <label kind="comments" x="-85" y="34">sync
+(with PO)</label>
+                <nail x="0" y="102"/>
+                <nail x="-102" y="102"/>
+                <nail x="-103" y="0"/>
+        </transition>
+        <transition>
+                <source ref="id30"/>
+                <target ref="id30"/>
+                <label kind="select" x="17" y="110">i: v_t</label>
+                <label kind="synchronisation" x="17" y="127">declare[i][id]?</label>
+                <label kind="comments" x="25" y="34">sync
+(with V)</label>
+                <nail x="0" y="102"/>
+                <nail x="102" y="102"/>
+                <nail x="102" y="0"/>
+        </transition>
+</template>

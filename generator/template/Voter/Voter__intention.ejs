@@ -1,0 +1,149 @@
+<%_ var withRec = false _%>
+<template>
+    <name>Voter__intention</name>
+    <parameter>v_t id</parameter>
+    <declaration>const int[0,1] RECCURING = <%= withRec ? 1 : 0 %>;
+
+/*
+Art. 53b. 
+
+§ 1. Zamiar głosowania korespondencyjnego wyborca zgłasza komisarzowi
+wyborczemu do 15 dnia przed dniem wyborów, z wyjątkiem wyborcy podlegającego w dniu
+głosowania obowiązkowej kwarantannie, izolacji lub izolacji w warunkach domowych, który
+zamiar głosowania komisarzowi wyborczemu zgłasza do 5 dnia przed dniem wyborów.
+
+§ 2. Zgłoszenie, o którym mowa w § 1, może być dokonane ustnie, pisemnie, telefaksem lub w
+formie elektronicznej.
+
+§ 3. Zgłoszenie, o którym mowa w § 1, powinno zawierać nazwisko i imię (imiona), imię ojca,
+datę urodzenia, numer ewidencyjny PESEL wyborcy, oświadczenie o wpisaniu tego wyborcy do
+rejestru wyborców w danej gminie, oznaczenie wyborów, których dotyczy zgłoszenie, a także
+wskazanie adresu, na który ma być wysłany pakiet wyborczy.
+
+§ 3a. Do zgłoszenia, o którym mowa w § 1, wyborca niepełnosprawny dołącza kopię
+aktualnego orzeczenia właściwego organu orzekającego o ustaleniu stopnia niepełnosprawności.
+
+§ 7. W zgłoszeniu, o którym mowa w § 1, wyborca niepełnosprawny może zażądać dołączenia
+do pakietu wyborczego nakładki na kartę do głosowania sporządzonej w alfabecie Braille’a.
+
+§ 8. Jeżeli głosowanie korespondencyjne ma dotyczyć wyborów Prezydenta Rzeczypospolitej
+albo wyborów wójta zgłoszenie zamiaru głosowania korespondencyjnego dotyczy również
+ponownego głosowania.
+
+§ 10. W przypadku gdy wyborca zgłosił zamiar głosowania korespondencyjnego,
+zaświadczenia o prawie do głosowania w miejscu pobytu w dniu wyborów nie wydaje się po
+wysłaniu do wyborcy pakietu wyborczego, chyba że wyborca zwrócił pakiet wyborczy w stanie
+nienaruszonym.
+*/</declaration>
+    <location id="id9" x="34" y="-306">
+    </location>
+    <location id="id10" x="-170" y="-76">
+    </location>
+    <location id="id11" x="238" y="34">
+    </location>
+    <location id="id12" x="34" y="263">
+    </location>
+    <location id="id13" x="34" y="34">
+    </location>
+    <location id="id14" x="34" y="-195">
+    </location>
+    <init ref="id9"/>
+    <transition>
+        <source ref="id14"/>
+        <target ref="id11"/>
+        <label kind="select" x="75" y="-280">i:if_t,
+j:a_t</label>
+        <label kind="guard" x="76" y="-246">owner[i]==id</label>
+        <label kind="synchronisation" x="76" y="-229">declare[id][j]!</label>
+        <label kind="assignment" x="76" y="-212">owner[i]=j</label>
+        <nail x="204" y="-195"/>
+    </transition>
+    <transition>
+        <source ref="id13"/>
+        <target ref="id11"/>
+        <label kind="select" x="76" y="153">i: if_t</label>
+        <label kind="guard" x="76" y="170">owner[i]==id &amp;&amp;
+envTo[i]&lt;0</label>
+        <label kind="assignment" x="76" y="204">owner[i]=envTo[i]</label>
+        <label kind="comments" x="76" y="119">async 
+(DST postbox)</label>
+        <nail x="68" y="153"/>
+        <nail x="204" y="153"/>
+    </transition>
+    <transition>
+        <source ref="id13"/>
+        <target ref="id11"/>
+        <label kind="select" x="76" y="34">i: if_t,
+j: po_t</label>
+        <label kind="guard" x="76" y="68">owner[i]==id</label>
+        <label kind="assignment" x="76" y="85">owner[i]=j</label>
+        <label kind="comments" x="76" y="-8">async 
+(PO postbox)</label>
+        <nail x="68" y="33"/>
+        <nail x="204" y="33"/>
+    </transition>
+    <transition>
+        <source ref="id13"/>
+        <target ref="id11"/>
+        <label kind="select" x="76" y="-169">i:if_t,
+j:po_t</label>
+        <label kind="guard" x="76" y="-136">owner[i]==id</label>
+        <label kind="synchronisation" x="76" y="-119">postSnd[j]!</label>
+        <label kind="assignment" x="76" y="-102">owner[i]=j</label>
+        <label kind="comments" x="76" y="-76">sync
+(hand to PO)</label>
+        <nail x="68" y="-85"/>
+        <nail x="204" y="-85"/>
+    </transition>
+    <transition>
+        <source ref="id11"/>
+        <target ref="id12"/>
+        <label kind="guard" x="119" y="272">!RECCURING</label>
+        <label kind="synchronisation" x="119" y="289">exitIntention[id]!</label>
+        <nail x="238" y="263"/>
+    </transition>
+    <transition>
+        <source ref="id10"/>
+        <target ref="id13"/>
+        <label kind="select" x="-127" y="42">iz: int[0,1], 
+j: addr_tx,
+k: int[0,NA],
+l: if_t,
+m: aid_tx</label>
+        <label kind="synchronisation" x="-127" y="127">fill[id][l]!</label>
+        <label kind="assignment" x="-127" y="144">envTo[l]=m,
+sh[0]=iz*id,
+sh[1]=j,
+sh[2]=k ? a_offset+k : 0</label>
+        <label kind="comments" x="-127" y="-8">async
+(e.g., post)</label>
+        <nail x="-136" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id10"/>
+        <target ref="id14"/>
+        <label kind="select" x="-127" y="-204">j: addr_t,
+k: a_t,
+l:if_t</label>
+        <label kind="synchronisation" x="-127" y="-153">fill[id][l]!</label>
+        <label kind="assignment" x="-127" y="-136">sh[0]=id, 
+sh[1]=j, 
+sh[2]=k</label>
+        <label kind="comments" x="-127" y="-68">sync
+(eg. phone/e-gov)</label>
+        <nail x="0" y="-76"/>
+    </transition>
+    <transition>
+        <source ref="id11"/>
+        <target ref="id9"/>
+        <label kind="guard" x="119" y="-348">RECCURING</label>
+        <label kind="synchronisation" x="119" y="-331">exitIntention[id]!</label>
+        <nail x="238" y="-306"/>
+    </transition>
+    <transition>
+        <source ref="id9"/>
+        <target ref="id10"/>
+        <label kind="synchronisation" x="-170" y="-331">enterIntention[id]?</label>
+        <nail x="-170" y="-306"/>
+    </transition>
+</template>

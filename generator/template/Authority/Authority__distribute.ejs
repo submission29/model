@@ -1,0 +1,43 @@
+<template>
+        <name>Authority__distribute</name>
+        <parameter>a_t id</parameter>
+        <location id="id32" x="-68" y="-34">
+        </location>
+        <init ref="id32"/>
+        <transition>
+                <source ref="id32"/>
+                <target ref="id32"/>
+                <label kind="select" x="-59" y="-221">i:ep_t,
+j:v_t,
+k:po_t</label>
+                <label kind="guard" x="-59" y="-170">owner[i]==id &amp;&amp;
+dqueue[j]!=0 &amp;&amp;
+dqueue[j]!=addrOf[id]</label>
+                <label kind="synchronisation" x="-59" y="-119">postSnd[k]!</label>
+                <label kind="assignment" x="-59" y="-102">owner[i]=k,
+dispatched[j]=1,
+dqueue[j]=0</label>
+                <label kind="comments" x="-153" y="-102">delegate 
+delivery</label>
+                <nail x="-170" y="-34"/>
+                <nail x="-170" y="-136"/>
+                <nail x="-68" y="-136"/>
+        </transition>
+        <transition>
+                <source ref="id32"/>
+                <target ref="id32"/>
+                <label kind="select" x="-59" y="-17">i:ep_t,
+j:v_t</label>
+                <label kind="guard" x="-59" y="17">owner[i]==id &amp;&amp;
+dqueue[j]==addrOf[id]</label>
+                <label kind="synchronisation" x="-59" y="51">collect[j][id]?</label>
+                <label kind="assignment" x="-59" y="68">owner[i]=j,
+dispatched[j]=1,
+dqueue[j]=0</label>
+                <label kind="comments" x="-153" y="0">in-person
+collection</label>
+                <nail x="-170" y="-34"/>
+                <nail x="-170" y="68"/>
+                <nail x="-68" y="68"/>
+        </transition>
+</template>

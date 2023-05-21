@@ -1,0 +1,62 @@
+<%_ var withRec = false _%>
+<template>
+    <name>Voter__fill</name>
+    <parameter>v_t id</parameter>
+    <declaration>const int[0,1] RECCURRING=<%= withRec ? 1 : 0 %>;</declaration>
+    <location id="id19" x="34" y="-306">
+    </location>
+    <location id="id20" x="34" y="34">
+    </location>
+    <location id="id21" x="34" y="-136">
+    </location>
+    <init ref="id19"/>
+    <transition>
+        <source ref="id21"/>
+        <target ref="id21"/>
+        <label kind="select" x="-34" y="-246">i:ep_t</label>
+        <label kind="synchronisation" x="-34" y="-229">sealOp[id][i][2]!</label>
+        <label kind="comments" x="-16" y="-179">seal</label>
+        <nail x="34" y="-204"/>
+        <nail x="-34" y="-204"/>
+        <nail x="-34" y="-136"/>
+    </transition>
+    <transition>
+        <source ref="id21"/>
+        <target ref="id21"/>
+        <label kind="select" x="-34" y="-127">i:ep_t,
+j:int[0,1],
+k:c_tx,
+m:int[0,NA]</label>
+        <label kind="synchronisation" x="-34" y="-59">fill[id][i]!</label>
+        <label kind="assignment" x="-34" y="-42">sh[1] = j*id,
+sh[2] = k,
+envTo[i]=m ? a_offset+m : 0</label>
+        <label kind="comments" x="59" y="-110">fill</label>
+        <nail x="102" y="-136"/>
+        <nail x="102" y="-68"/>
+        <nail x="34" y="-68"/>
+    </transition>
+    <transition>
+        <source ref="id21"/>
+        <target ref="id19"/>
+        <label kind="guard" x="102" y="-348">RECCURRING</label>
+        <label kind="synchronisation" x="102" y="-331">exitFill[id]!</label>
+        <nail x="204" y="-136"/>
+        <nail x="204" y="-306"/>
+    </transition>
+    <transition>
+        <source ref="id21"/>
+        <target ref="id20"/>
+        <label kind="guard" x="102" y="42">!RECCURRING</label>
+        <label kind="synchronisation" x="102" y="59">exitFill[id]!</label>
+        <nail x="204" y="-136"/>
+        <nail x="204" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id19"/>
+        <target ref="id21"/>
+        <label kind="synchronisation" x="-136" y="-331">enterFill[id]?</label>
+        <nail x="-136" y="-306"/>
+        <nail x="-136" y="-136"/>
+    </transition>
+</template>

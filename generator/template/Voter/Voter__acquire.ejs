@@ -1,0 +1,87 @@
+<%_ var withRec = false _%>
+<template>
+    <name>Voter__acquire</name>
+    <parameter>v_t id</parameter>
+    <declaration>const int[0,1] RECCURRING=<%= withRec ? 1 : 0 %>;</declaration>
+    <location id="id15" x="-408" y="-340">
+    </location>
+    <location id="id16" x="-510" y="-119">
+    </location>
+    <location id="id17" x="-306" y="-119">
+    </location>
+    <location id="id18" x="-306" y="204">
+    </location>
+    <init ref="id15"/>
+    <transition>
+        <source ref="id16"/>
+        <target ref="id17"/>
+        <label kind="select" x="-493" y="136">i:ep_t,
+j:v_t</label>
+        <label kind="guard" x="-494" y="170">canSteal[id] &amp;&amp;
+owner[i]==addrOf[j]</label>
+        <label kind="assignment" x="-493" y="204">owner[i]=id</label>
+        <label kind="comments" x="-493" y="110">ANY Voter postbox</label>
+        <nail x="-510" y="136"/>
+        <nail x="-306" y="136"/>
+    </transition>
+    <transition>
+        <source ref="id16"/>
+        <target ref="id17"/>
+        <label kind="select" x="-493" y="-68">i:fep_t</label>
+        <label kind="guard" x="-493" y="-51">owner[i]==0</label>
+        <label kind="assignment" x="-494" y="-34">owner[i]=id</label>
+        <label kind="comments" x="-493" y="-93">forge</label>
+        <nail x="-510" y="-68"/>
+        <nail x="-306" y="-68"/>
+    </transition>
+    <transition>
+        <source ref="id16"/>
+        <target ref="id17"/>
+        <label kind="select" x="-493" y="-306">i:a_t</label>
+        <label kind="synchronisation" x="-493" y="-289">collect[id][i]!</label>
+        <label kind="comments" x="-493" y="-263">at authority place</label>
+        <nail x="-510" y="-272"/>
+        <nail x="-306" y="-272"/>
+    </transition>
+    <transition>
+        <source ref="id17"/>
+        <target ref="id15"/>
+        <label kind="guard" x="-340" y="-382">RECCURRING</label>
+        <label kind="synchronisation" x="-340" y="-365">exitAcquire[id]!</label>
+        <nail x="-238" y="-119"/>
+        <nail x="-238" y="-340"/>
+    </transition>
+    <transition>
+        <source ref="id16"/>
+        <target ref="id17"/>
+        <label kind="select" x="-493" y="-221">i:ep_t</label>
+        <label kind="guard" x="-493" y="-204">owner[i]==addrOf[id]</label>
+        <label kind="assignment" x="-494" y="-187">owner[i]=id</label>
+        <label kind="comments" x="-493" y="-161">own postbox</label>
+        <nail x="-510" y="-170"/>
+        <nail x="-306" y="-170"/>
+    </transition>
+    <transition>
+        <source ref="id17"/>
+        <target ref="id18"/>
+        <label kind="guard" x="-340" y="221">!RECCURRING</label>
+        <label kind="synchronisation" x="-340" y="238">exitAcquire[id]!</label>
+        <nail x="-238" y="-119"/>
+        <nail x="-238" y="204"/>
+    </transition>
+    <transition>
+        <source ref="id16"/>
+        <target ref="id17"/>
+        <label kind="synchronisation" x="-493" y="34">pass[id]?</label>
+        <label kind="comments" x="-493" y="9">non-authority</label>
+        <nail x="-510" y="34"/>
+        <nail x="-306" y="34"/>
+    </transition>
+    <transition>
+        <source ref="id15"/>
+        <target ref="id16"/>
+        <label kind="synchronisation" x="-578" y="-365">enterAcquire[id]?</label>
+        <nail x="-578" y="-340"/>
+        <nail x="-578" y="-119"/>
+    </transition>
+</template>

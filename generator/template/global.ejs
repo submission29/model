@@ -1,0 +1,147 @@
+<% NEP = Math.max(NEP,NV) -%>
+<% NIF = Math.max(NIF,NV) -%>
+<% NAgt = NV+NA+NPO -%>
+<% NObj = NIF+NEP -%>
+/*
+Agents:
+- Voter
+- [Authority] Municipal office 
+- [Authority] Election commission
+- [ThirdParty] Postal office
+- [Adversary] Coercer
+*/
+
+const int NC = <%=NC%>;     // total number of candidates
+
+const int NV = <%=NV%>;     // total number of voters
+const int NPO = <%=NPO%>;   // total number of postal offices
+const int NA = <%=NA%>;     // total number of authority entities
+const int NIF = <%=NIF%>;   // total number of intention forms
+const int NEP = <%=NEP%>;   // total number of election packages
+
+const int NAgt = <%=NAgt%>; // total number of agents, partitioned as [NV | NA | NPO]
+const int NObj = <%=NObj%>; // total number of agents, partitioned as [NIF | NEP] 
+
+const int NObjProp = 3;     // max number of (private) properties for an object (arbitrary upper bound can also be used)
+                            // IF is a tuple (voterPesel, deliveryAddress, municipalOffice)
+                            // EP is a tuple (validStamp, voterCardSignature, crossedCell)
+
+
+int sh[NObjProp];           // shared values (must be reset back to 0 for optimal state space)
+
+/*--------------------------------------*/
+
+typedef int[1,NC] c_t;
+typedef int[-1,NC] c_tx; // -1 for multi-cand
+
+typedef int[1,NV] v_t;
+typedef int[0,NV] v_tx;
+typedef int[1+NV, NV+NA] a_t;
+typedef int[1+NV+NA, NV+NA+NPO] po_t;
+
+
+// offsets used in construct with "zero" option
+const int v_offset = 0;
+const int a_offset = NV;
+const int po_offset = NV+NA;
+
+typedef int[1, NIF] if_t;
+typedef int[1+NIF, NIF+NEP] ep_t;       // all EP
+typedef int[<%= NEP-NV>0 ? "1+NIF+NV" : "NIF+NEP" %>, NIF+NEP] fep_t;   // extra (forged) EP
+
+typedef int[1,NAgt] aid_t; // agent identifier
+typedef int[1,NObj] oid_t; // object identifier
+typedef int[-NAgt, -1] addr_t;   // agent's address that also mimics transitive ownership (e.g., postbox)
+
+typedef int[-NAgt, 0] addr_tx;   // agent's address, where 0 stands for "NONE" 
+typedef int[-NAgt, NAgt] aid_tx; // agent identifier or address, where 0 stands for "NONE" 
+typedef int[0,NObj] oid_tx;      // object identifier, where 0 stands for "NONE"
+
+
+/*======================================*/
+// Behaviour-related configuration
+
+// Addr link
+const addr_t addrOf[aid_t] = { <%= Array.from({length: NAgt}, (x, i) => -i-1).join(','); %> };
+
+// Ability to steal from other (Voters) postbox
+const int[0,1] canSteal[v_t] = { <%= Array.from({length: NV}, (x, i) => 1).join(','); %> };
+
+
+/*======================================*/
+
+/*======================================*/
+
+// Common OBJ property
+aid_tx owner[oid_t]; // must be initialized to 0 (here "NONE" also denotes that an object was not yet "created/forged")
+
+// IF data (assumed to be immutable, as one could just take/forge new one for modifications)
+v_tx if_voter[if_t];    // sender's PESEL (used for eligibility check)
+aid_tx if_addr[if_t];  // delivery address (use same MO_addr for inperson collection)
+aid_tx if_gov[if_t];   // target Municipal Office 
+
+// EP data
+int[0,1] ep_stmp[ep_t]; // stamp on ballot
+v_tx ep_sgn[ep_t];      // signature + pesel
+c_tx ep_x[ep_t];        // cross (where -1 stands for multi)
+
+// Voter register (simplified); starts with 0 for technical reasons 
+const int[0,1] eligible[v_tx] = { 0, <%= Array.from({length: NV}, (x, i) => 1).join(','); %> };
+
+aid_tx dqueue[v_tx];         // EP dispatch queued address (with 0 for technical reasons)
+int[0,1] dispatched[v_t];    // EP dispatch status
+int[0,1] recorded[v_t];      // RE recorded (after openning)
+
+int[0,1] openRE[ep_t];     //
+int[0,1] procRE[ep_t];     //
+
+int[0,1] inBox[ep_t];      // 
+
+int[0,1] openBE[ep_t];     //
+int[0,1] procBE[ep_t];     //
+
+int[0,NAgt] tally[c_tx];    // from -1 for technical reasons
+
+
+// IF, EP status (from Authority perspective)
+int[0,1] if_chk[if_t];  // indicated whether particular IF was processed
+int[0,1] ep_chk[ep_t];  // indicated whether particular EP (RE) was processed
+
+
+/*======================================*/
+
+chan enterIntention[v_t], exitIntention[v_t];   // binds Voter and Voter__intention
+chan enterAcquire[v_t], exitAcquire[v_t];       // binds Voter and Voter__acquire
+chan enterFill[v_t], exitFill[v_t];             // binds Voter and Voter__fill
+chan enterCast[v_t], exitCast[v_t];             // binds Voter and Voter__cast
+chan enterHandout[v_t], exitHandout[v_t];       // binds Voter and Voter__handout
+
+/*--------------------------------------*/
+
+chan postSnd[po_t];    // issue delivery of OBJ to AGT
+chan postRcv[aid_t];   // complete delivery of OBJ to AGT
+
+// sender is not currently used
+// aid_tx envFrom[oid_t];         // maps OBJ to ADDR of origin
+aid_tx envTo[oid_t];              // maps OBJ to ADDR of destination
+
+/*--------------------------------------*/
+
+// alternatively, could be passed via aid_t
+chan collect[v_t][a_t];                   // collection of EP (in-person) from Municpial office
+chan pass[aid_t];                         // serves for hand out of EPs to AGT
+chan declare[v_t][a_t];                   // for sync IF pass from V to Auth
+chan cast[v_t][a_t];                      // for sync EP (RE) pass from V to Auth
+
+/*--------------------------------------*/
+
+chan fill[aid_t][oid_t];
+chan info[aid_t][oid_t];
+
+
+chan sealOp[aid_t][ep_t][3];  // 2 for seal, 1 for unseal, 0 for unseal (w/o ripping)
+
+<!-- 
+    From https://stackoverflow.com/questions/56347093/value-passing-through-channels 
+    it follows that value passing via channels could performe worse than via global vars
+-->

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<%_ var dir = process.cwd() _%>
+	
+	<declaration><%- include(dir+"/global.ejs") %></declaration>
+	<%- include(dir+"/Voter/Voter.ejs") %>
+	<%- include(dir+"/Voter/Voter__acquire.ejs") %>
+	<%- include(dir+"/Voter/Voter__cast.ejs") %>
+	<%- include(dir+"/Voter/Voter__fill.ejs") %>
+	<%- include(dir+"/Voter/Voter__handout.ejs") %>
+	<%- include(dir+"/Voter/Voter__intention.ejs") %>
+	
+	<%- include(dir+"/Authority/Authority__aggregate.ejs") %>
+	<%- include(dir+"/Authority/Authority__distribute.ejs") %>
+	<%- include(dir+"/Authority/Authority__intention.ejs") %>
+	<%- include(dir+"/Authority/Authority__prepare.ejs") %>
+	<%- include(dir+"/Authority/Authority__record.ejs") %>
+	
+	<%- include(dir+"/PostOffice/PostOffice__accept.ejs") %>
+	<%- include(dir+"/PostOffice/PostOffice__alter.ejs") %>
+	<%- include(dir+"/PostOffice/PostOffice__deliver.ejs") %>
+
+	<%- include(dir+"/IntentionForm/IntentionForm.ejs") %>
+
+	<%- include(dir+"/ElectionPackage/ElectionPackage.ejs") %>
+	<system>system Voter, Voter__intention, Authority__intention, PostOffice__accept, PostOffice__deliver, IntentionForm,
+       Voter__acquire, Voter__handout, Authority__prepare, Authority__distribute, ElectionPackage, PostOffice__alter,
+       Voter__fill, Voter__cast, Authority__aggregate, Authority__record;
+
+</system>
+	<queries>
+		<query>
+			<formula>E&lt;&gt;tally[1]&gt;0</formula>
+			<comment></comment>
+		</query>
+		<query>
+			<formula>A[] ElectionPackage.rseal imply ElectionPackage.rintact</formula>
+			<comment>Sanity check</comment>
+		</query>
+		<query>
+			<formula>A[] ElectionPackage.bseal imply ElectionPackage.bintact</formula>
+			<comment>Sanity check</comment>
+		</query>
+	</queries>
+</nta>
