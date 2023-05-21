@@ -1,0 +1,1222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>/*
+Agents:
+- Voter
+- [Authority] Municipal office 
+- [Authority] Election commission
+- [ThirdParty] Postal office
+- [Adversary] Coercer
+*/
+
+const int NC = 1;     // total number of candidates
+
+const int NV = 1;     // total number of voters
+const int NPO = 1;   // total number of postal offices
+const int NA = 1;     // total number of authority entities
+const int NIF = 2;   // total number of intention forms
+const int NEP = 1;   // total number of election packages
+
+const int NAgt = 3; // total number of agents, partitioned as [NV | NA | NPO]
+const int NObj = 3; // total number of agents, partitioned as [NIF | NEP] 
+
+const int NObjProp = 3;     // max number of (private) properties for an object (arbitrary upper bound can also be used)
+                            // IF is a tuple (voterPesel, deliveryAddress, municipalOffice)
+                            // EP is a tuple (validStamp, voterCardSignature, crossedCell)
+
+
+int sh[NObjProp];           // shared values (must be reset back to 0 for optimal state space)
+
+/*--------------------------------------*/
+
+typedef int[1,NC] c_t;
+typedef int[-1,NC] c_tx; // -1 for multi-cand
+
+typedef int[1,NV] v_t;
+typedef int[0,NV] v_tx;
+typedef int[1+NV, NV+NA] a_t;
+typedef int[1+NV+NA, NV+NA+NPO] po_t;
+
+
+// offsets used in construct with "zero" option
+const int v_offset = 0;
+const int a_offset = NV;
+const int po_offset = NV+NA;
+
+typedef int[1, NIF] if_t;
+typedef int[1+NIF, NIF+NEP] ep_t;       // all EP
+typedef int[NIF+NEP, NIF+NEP] fep_t;   // extra (forged) EP
+
+typedef int[1,NAgt] aid_t; // agent identifier
+typedef int[1,NObj] oid_t; // object identifier
+typedef int[-NAgt, -1] addr_t;   // agent's address that also mimics transitive ownership (e.g., postbox)
+
+typedef int[-NAgt, 0] addr_tx;   // agent's address, where 0 stands for "NONE" 
+typedef int[-NAgt, NAgt] aid_tx; // agent identifier or address, where 0 stands for "NONE" 
+typedef int[0,NObj] oid_tx;      // object identifier, where 0 stands for "NONE"
+
+
+/*======================================*/
+// Behaviour-related configuration
+
+// Addr link
+const addr_t addrOf[aid_t] = { -1,-2,-3 };
+
+// Ability to steal from other (Voters) postbox
+const int[0,1] canSteal[v_t] = { 1 };
+
+
+/*======================================*/
+
+/*======================================*/
+
+// Common OBJ property
+aid_tx owner[oid_t]; // must be initialized to 0 (here "NONE" also denotes that an object was not yet "created/forged")
+
+// IF data (assumed to be immutable, as one could just take/forge new one for modifications)
+v_tx if_voter[if_t];    // sender's PESEL (used for eligibility check)
+aid_tx if_addr[if_t];  // delivery address (use same MO_addr for inperson collection)
+aid_tx if_gov[if_t];   // target Municipal Office 
+
+// EP data
+int[0,1] ep_stmp[ep_t]; // stamp on ballot
+v_tx ep_sgn[ep_t];      // signature + pesel
+c_tx ep_x[ep_t];        // cross (where -1 stands for multi)
+
+// Voter register (simplified); starts with 0 for technical reasons 
+const int[0,1] eligible[v_tx] = { 0, 1 };
+
+aid_tx dqueue[v_tx];         // EP dispatch queued address (with 0 for technical reasons)
+int[0,1] dispatched[v_t];    // EP dispatch status
+int[0,1] recorded[v_t];      // RE recorded (after openning)
+
+int[0,1] openRE[ep_t];     //
+int[0,1] procRE[ep_t];     //
+
+int[0,1] inBox[ep_t];      // 
+
+int[0,1] openBE[ep_t];     //
+int[0,1] procBE[ep_t];     //
+
+int[0,NAgt] tally[c_tx];    // from -1 for technical reasons
+
+
+// IF, EP status (from Authority perspective)
+int[0,1] if_chk[if_t];  // indicated whether particular IF was processed
+int[0,1] ep_chk[ep_t];  // indicated whether particular EP (RE) was processed
+
+
+/*======================================*/
+
+chan enterIntention[v_t], exitIntention[v_t];   // binds Voter and Voter__intention
+chan enterAcquire[v_t], exitAcquire[v_t];       // binds Voter and Voter__acquire
+chan enterFill[v_t], exitFill[v_t];             // binds Voter and Voter__fill
+chan enterCast[v_t], exitCast[v_t];             // binds Voter and Voter__cast
+chan enterHandout[v_t], exitHandout[v_t];       // binds Voter and Voter__handout
+
+/*--------------------------------------*/
+
+chan postSnd[po_t];    // issue delivery of OBJ to AGT
+chan postRcv[aid_t];   // complete delivery of OBJ to AGT
+
+// sender is not currently used
+// aid_tx envFrom[oid_t];         // maps OBJ to ADDR of origin
+aid_tx envTo[oid_t];              // maps OBJ to ADDR of destination
+
+/*--------------------------------------*/
+
+// alternatively, could be passed via aid_t
+chan collect[v_t][a_t];                   // collection of EP (in-person) from Municpial office
+chan pass[aid_t];                         // serves for hand out of EPs to AGT
+chan declare[v_t][a_t];                   // for sync IF pass from V to Auth
+chan cast[v_t][a_t];                      // for sync EP (RE) pass from V to Auth
+
+/*--------------------------------------*/
+
+chan fill[aid_t][oid_t];
+chan info[aid_t][oid_t];
+
+
+chan sealOp[aid_t][ep_t][3];  // 2 for seal, 1 for unseal, 0 for unseal (w/o ripping)
+
+<!-- 
+    From https://stackoverflow.com/questions/56347093/value-passing-through-channels 
+    it follows that value passing via channels could performe worse than via global vars
+--></declaration>
+	<template>
+		<name>Voter</name>
+		<parameter>v_t id</parameter>
+		<declaration>/*
+Local declarations for the Voter
+*/
+    </declaration>
+		<location id="id0" x="-1224" y="-476">
+			<name x="-1215" y="-467">idle</name>
+		</location>
+		<location id="id1" x="-884" y="-476">
+			<name x="-875" y="-467">waits</name>
+		</location>
+		<location id="id2" x="-1054" y="-476">
+			<name x="-1045" y="-467">Intention</name>
+		</location>
+		<location id="id3" x="-884" y="-340">
+			<name x="-875" y="-331">has</name>
+		</location>
+		<location id="id4" x="-714" y="-340">
+			<name x="-705" y="-331">Fill</name>
+		</location>
+		<location id="id5" x="-544" y="-340">
+			<name x="-535" y="-331">filled</name>
+		</location>
+		<location id="id6" x="-714" y="-272">
+			<name x="-705" y="-263">Cast</name>
+		</location>
+		<location id="id7" x="-1054" y="-408">
+			<name x="-1045" y="-399">Acquire</name>
+		</location>
+		<location id="id8" x="-714" y="-408">
+			<name x="-705" y="-399">Handout</name>
+		</location>
+		<init ref="id0"/>
+		<transition>
+			<source ref="id5"/>
+			<target ref="id8"/>
+			<label kind="synchronisation" x="-680" y="-433">enterHandout[id]!</label>
+			<nail x="-544" y="-408"/>
+			<nail x="-697" y="-408"/>
+		</transition>
+		<transition>
+			<source ref="id8"/>
+			<target ref="id0"/>
+			<label kind="synchronisation" x="-1190" y="-569">exitHandout[id]?</label>
+			<nail x="-714" y="-544"/>
+			<nail x="-1224" y="-544"/>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id8"/>
+			<label kind="synchronisation" x="-850" y="-433">enterHandout[id]!</label>
+			<nail x="-884" y="-408"/>
+		</transition>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id0"/>
+			<label kind="synchronisation" x="-1224" y="-263">exitCast[id]?</label>
+			<nail x="-714" y="-238"/>
+			<nail x="-1258" y="-238"/>
+			<nail x="-1258" y="-476"/>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id6"/>
+			<label kind="synchronisation" x="-850" y="-297">enterCast[id]!</label>
+			<nail x="-884" y="-272"/>
+		</transition>
+		<transition>
+			<source ref="id5"/>
+			<target ref="id6"/>
+			<label kind="synchronisation" x="-680" y="-297">enterCast[id]!</label>
+			<nail x="-544" y="-272"/>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id5"/>
+			<label kind="synchronisation" x="-680" y="-365">exitFill[id]?</label>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id4"/>
+			<label kind="synchronisation" x="-850" y="-365">enterFill[id]!</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id7"/>
+			<label kind="synchronisation" x="-1190" y="-433">enterAcquire[id]!</label>
+			<nail x="-1224" y="-408"/>
+		</transition>
+		<transition>
+			<source ref="id7"/>
+			<target ref="id3"/>
+			<label kind="synchronisation" x="-1020" y="-365">exitAcquire[id]?</label>
+			<nail x="-1054" y="-340"/>
+		</transition>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id7"/>
+			<label kind="synchronisation" x="-1020" y="-433">enterAcquire[id]!</label>
+			<nail x="-884" y="-408"/>
+		</transition>
+		<transition>
+			<source ref="id2"/>
+			<target ref="id1"/>
+			<label kind="synchronisation" x="-1020" y="-501">exitIntention[id]?</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id2"/>
+			<label kind="synchronisation" x="-1190" y="-501">enterIntention[id]!</label>
+		</transition>
+	</template>
+	<template>
+		<name>Voter__intention</name>
+		<parameter>v_t id</parameter>
+		<declaration>const int[0,1] RECCURING = 0;
+
+/*
+Art. 53b. 
+
+§ 1. Zamiar głosowania korespondencyjnego wyborca zgłasza komisarzowi
+wyborczemu do 15 dnia przed dniem wyborów, z wyjątkiem wyborcy podlegającego w dniu
+głosowania obowiązkowej kwarantannie, izolacji lub izolacji w warunkach domowych, który
+zamiar głosowania komisarzowi wyborczemu zgłasza do 5 dnia przed dniem wyborów.
+
+§ 2. Zgłoszenie, o którym mowa w § 1, może być dokonane ustnie, pisemnie, telefaksem lub w
+formie elektronicznej.
+
+§ 3. Zgłoszenie, o którym mowa w § 1, powinno zawierać nazwisko i imię (imiona), imię ojca,
+datę urodzenia, numer ewidencyjny PESEL wyborcy, oświadczenie o wpisaniu tego wyborcy do
+rejestru wyborców w danej gminie, oznaczenie wyborów, których dotyczy zgłoszenie, a także
+wskazanie adresu, na który ma być wysłany pakiet wyborczy.
+
+§ 3a. Do zgłoszenia, o którym mowa w § 1, wyborca niepełnosprawny dołącza kopię
+aktualnego orzeczenia właściwego organu orzekającego o ustaleniu stopnia niepełnosprawności.
+
+§ 7. W zgłoszeniu, o którym mowa w § 1, wyborca niepełnosprawny może zażądać dołączenia
+do pakietu wyborczego nakładki na kartę do głosowania sporządzonej w alfabecie Braille’a.
+
+§ 8. Jeżeli głosowanie korespondencyjne ma dotyczyć wyborów Prezydenta Rzeczypospolitej
+albo wyborów wójta zgłoszenie zamiaru głosowania korespondencyjnego dotyczy również
+ponownego głosowania.
+
+§ 10. W przypadku gdy wyborca zgłosił zamiar głosowania korespondencyjnego,
+zaświadczenia o prawie do głosowania w miejscu pobytu w dniu wyborów nie wydaje się po
+wysłaniu do wyborcy pakietu wyborczego, chyba że wyborca zwrócił pakiet wyborczy w stanie
+nienaruszonym.
+*/</declaration>
+		<location id="id9" x="34" y="-306">
+		</location>
+		<location id="id10" x="-170" y="-76">
+		</location>
+		<location id="id11" x="238" y="34">
+		</location>
+		<location id="id12" x="34" y="263">
+		</location>
+		<location id="id13" x="34" y="34">
+		</location>
+		<location id="id14" x="34" y="-195">
+		</location>
+		<init ref="id9"/>
+		<transition>
+			<source ref="id14"/>
+			<target ref="id11"/>
+			<label kind="select" x="75" y="-280">i:if_t,
+j:a_t</label>
+			<label kind="guard" x="76" y="-246">owner[i]==id</label>
+			<label kind="synchronisation" x="76" y="-229">declare[id][j]!</label>
+			<label kind="assignment" x="76" y="-212">owner[i]=j</label>
+			<nail x="204" y="-195"/>
+		</transition>
+		<transition>
+			<source ref="id13"/>
+			<target ref="id11"/>
+			<label kind="select" x="76" y="153">i: if_t</label>
+			<label kind="guard" x="76" y="170">owner[i]==id &amp;&amp;
+envTo[i]&lt;0</label>
+			<label kind="assignment" x="76" y="204">owner[i]=envTo[i]</label>
+			<label kind="comments" x="76" y="119">async 
+(DST postbox)</label>
+			<nail x="68" y="153"/>
+			<nail x="204" y="153"/>
+		</transition>
+		<transition>
+			<source ref="id13"/>
+			<target ref="id11"/>
+			<label kind="select" x="76" y="34">i: if_t,
+j: po_t</label>
+			<label kind="guard" x="76" y="68">owner[i]==id</label>
+			<label kind="assignment" x="76" y="85">owner[i]=j</label>
+			<label kind="comments" x="76" y="-8">async 
+(PO postbox)</label>
+			<nail x="68" y="33"/>
+			<nail x="204" y="33"/>
+		</transition>
+		<transition>
+			<source ref="id13"/>
+			<target ref="id11"/>
+			<label kind="select" x="76" y="-169">i:if_t,
+j:po_t</label>
+			<label kind="guard" x="76" y="-136">owner[i]==id</label>
+			<label kind="synchronisation" x="76" y="-119">postSnd[j]!</label>
+			<label kind="assignment" x="76" y="-102">owner[i]=j</label>
+			<label kind="comments" x="76" y="-76">sync
+(hand to PO)</label>
+			<nail x="68" y="-85"/>
+			<nail x="204" y="-85"/>
+		</transition>
+		<transition>
+			<source ref="id11"/>
+			<target ref="id12"/>
+			<label kind="guard" x="119" y="272">!RECCURING</label>
+			<label kind="synchronisation" x="119" y="289">exitIntention[id]!</label>
+			<nail x="238" y="263"/>
+		</transition>
+		<transition>
+			<source ref="id10"/>
+			<target ref="id13"/>
+			<label kind="select" x="-127" y="42">iz: int[0,1], 
+j: addr_tx,
+k: int[0,NA],
+l: if_t,
+m: aid_tx</label>
+			<label kind="synchronisation" x="-127" y="127">fill[id][l]!</label>
+			<label kind="assignment" x="-127" y="144">envTo[l]=m,
+sh[0]=iz*id,
+sh[1]=j,
+sh[2]=k ? a_offset+k : 0</label>
+			<label kind="comments" x="-127" y="-8">async
+(e.g., post)</label>
+			<nail x="-136" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id10"/>
+			<target ref="id14"/>
+			<label kind="select" x="-127" y="-204">j: addr_t,
+k: a_t,
+l:if_t</label>
+			<label kind="synchronisation" x="-127" y="-153">fill[id][l]!</label>
+			<label kind="assignment" x="-127" y="-136">sh[0]=id, 
+sh[1]=j, 
+sh[2]=k</label>
+			<label kind="comments" x="-127" y="-68">sync
+(eg. phone/e-gov)</label>
+			<nail x="0" y="-76"/>
+		</transition>
+		<transition>
+			<source ref="id11"/>
+			<target ref="id9"/>
+			<label kind="guard" x="119" y="-348">RECCURING</label>
+			<label kind="synchronisation" x="119" y="-331">exitIntention[id]!</label>
+			<nail x="238" y="-306"/>
+		</transition>
+		<transition>
+			<source ref="id9"/>
+			<target ref="id10"/>
+			<label kind="synchronisation" x="-170" y="-331">enterIntention[id]?</label>
+			<nail x="-170" y="-306"/>
+		</transition>
+	</template>
+	<template>
+		<name>Voter__acquire</name>
+		<parameter>v_t id</parameter>
+		<declaration>const int[0,1] RECCURRING=0;</declaration>
+		<location id="id15" x="-408" y="-340">
+		</location>
+		<location id="id16" x="-510" y="-119">
+		</location>
+		<location id="id17" x="-306" y="-119">
+		</location>
+		<location id="id18" x="-306" y="204">
+		</location>
+		<init ref="id15"/>
+		<transition>
+			<source ref="id16"/>
+			<target ref="id17"/>
+			<label kind="select" x="-493" y="136">i:ep_t,
+j:v_t</label>
+			<label kind="guard" x="-494" y="170">canSteal[id] &amp;&amp;
+owner[i]==addrOf[j]</label>
+			<label kind="assignment" x="-493" y="204">owner[i]=id</label>
+			<label kind="comments" x="-493" y="110">ANY Voter postbox</label>
+			<nail x="-510" y="136"/>
+			<nail x="-306" y="136"/>
+		</transition>
+		<transition>
+			<source ref="id16"/>
+			<target ref="id17"/>
+			<label kind="select" x="-493" y="-68">i:fep_t</label>
+			<label kind="guard" x="-493" y="-51">owner[i]==0</label>
+			<label kind="assignment" x="-494" y="-34">owner[i]=id</label>
+			<label kind="comments" x="-493" y="-93">forge</label>
+			<nail x="-510" y="-68"/>
+			<nail x="-306" y="-68"/>
+		</transition>
+		<transition>
+			<source ref="id16"/>
+			<target ref="id17"/>
+			<label kind="select" x="-493" y="-306">i:a_t</label>
+			<label kind="synchronisation" x="-493" y="-289">collect[id][i]!</label>
+			<label kind="comments" x="-493" y="-263">at authority place</label>
+			<nail x="-510" y="-272"/>
+			<nail x="-306" y="-272"/>
+		</transition>
+		<transition>
+			<source ref="id17"/>
+			<target ref="id15"/>
+			<label kind="guard" x="-340" y="-382">RECCURRING</label>
+			<label kind="synchronisation" x="-340" y="-365">exitAcquire[id]!</label>
+			<nail x="-238" y="-119"/>
+			<nail x="-238" y="-340"/>
+		</transition>
+		<transition>
+			<source ref="id16"/>
+			<target ref="id17"/>
+			<label kind="select" x="-493" y="-221">i:ep_t</label>
+			<label kind="guard" x="-493" y="-204">owner[i]==addrOf[id]</label>
+			<label kind="assignment" x="-494" y="-187">owner[i]=id</label>
+			<label kind="comments" x="-493" y="-161">own postbox</label>
+			<nail x="-510" y="-170"/>
+			<nail x="-306" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id17"/>
+			<target ref="id18"/>
+			<label kind="guard" x="-340" y="221">!RECCURRING</label>
+			<label kind="synchronisation" x="-340" y="238">exitAcquire[id]!</label>
+			<nail x="-238" y="-119"/>
+			<nail x="-238" y="204"/>
+		</transition>
+		<transition>
+			<source ref="id16"/>
+			<target ref="id17"/>
+			<label kind="synchronisation" x="-493" y="34">pass[id]?</label>
+			<label kind="comments" x="-493" y="9">non-authority</label>
+			<nail x="-510" y="34"/>
+			<nail x="-306" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id15"/>
+			<target ref="id16"/>
+			<label kind="synchronisation" x="-578" y="-365">enterAcquire[id]?</label>
+			<nail x="-578" y="-340"/>
+			<nail x="-578" y="-119"/>
+		</transition>
+	</template>
+	<template>
+		<name>Voter__fill</name>
+		<parameter>v_t id</parameter>
+		<declaration>const int[0,1] RECCURRING=0;</declaration>
+		<location id="id19" x="34" y="-306">
+		</location>
+		<location id="id20" x="34" y="34">
+		</location>
+		<location id="id21" x="34" y="-136">
+		</location>
+		<init ref="id19"/>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id21"/>
+			<label kind="select" x="-34" y="-246">i:ep_t</label>
+			<label kind="synchronisation" x="-34" y="-229">sealOp[id][i][2]!</label>
+			<label kind="comments" x="-16" y="-179">seal</label>
+			<nail x="34" y="-204"/>
+			<nail x="-34" y="-204"/>
+			<nail x="-34" y="-136"/>
+		</transition>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id21"/>
+			<label kind="select" x="-34" y="-127">i:ep_t,
+j:int[0,1],
+k:c_tx,
+m:int[0,NA]</label>
+			<label kind="synchronisation" x="-34" y="-59">fill[id][i]!</label>
+			<label kind="assignment" x="-34" y="-42">sh[1] = j*id,
+sh[2] = k,
+envTo[i]=m ? a_offset+m : 0</label>
+			<label kind="comments" x="59" y="-110">fill</label>
+			<nail x="102" y="-136"/>
+			<nail x="102" y="-68"/>
+			<nail x="34" y="-68"/>
+		</transition>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id19"/>
+			<label kind="guard" x="102" y="-348">RECCURRING</label>
+			<label kind="synchronisation" x="102" y="-331">exitFill[id]!</label>
+			<nail x="204" y="-136"/>
+			<nail x="204" y="-306"/>
+		</transition>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id20"/>
+			<label kind="guard" x="102" y="42">!RECCURRING</label>
+			<label kind="synchronisation" x="102" y="59">exitFill[id]!</label>
+			<nail x="204" y="-136"/>
+			<nail x="204" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id19"/>
+			<target ref="id21"/>
+			<label kind="synchronisation" x="-136" y="-331">enterFill[id]?</label>
+			<nail x="-136" y="-306"/>
+			<nail x="-136" y="-136"/>
+		</transition>
+	</template>
+	<template>
+		<name>Voter__cast</name>
+		<parameter>v_t id</parameter>
+		<declaration>const int[0,1] RECCURRING=0;</declaration>
+		<location id="id22" x="-34" y="-170">
+		</location>
+		<location id="id23" x="204" y="-136">
+		</location>
+		<location id="id24" x="204" y="34">
+		</location>
+		<location id="id25" x="442" y="68">
+		</location>
+		<init ref="id22"/>
+		<transition>
+			<source ref="id24"/>
+			<target ref="id22"/>
+			<label kind="guard" x="0" y="76">RECCURRING</label>
+			<label kind="synchronisation" x="0" y="93">exitCast[id]!</label>
+			<nail x="204" y="68"/>
+			<nail x="-34" y="68"/>
+		</transition>
+		<transition>
+			<source ref="id23"/>
+			<target ref="id24"/>
+			<label kind="select" x="143" y="-85">i:ep_t,
+j:a_t</label>
+			<label kind="guard" x="144" y="-51">owner[i]==id &amp;&amp; 
+envTo[i]==j</label>
+			<label kind="synchronisation" x="145" y="-17">cast[id][j]!</label>
+			<label kind="assignment" x="144" y="0">owner[i]=j</label>
+			<label kind="comments" x="144" y="-127">sync
+(MO)</label>
+			<nail x="135" y="-136"/>
+			<nail x="135" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id23"/>
+			<target ref="id24"/>
+			<label kind="select" x="416" y="-85">i:ep_t</label>
+			<label kind="guard" x="416" y="-68">owner[i]==id &amp;&amp;
+envTo[i]&lt;0</label>
+			<label kind="assignment" x="416" y="-34">owner[i]=envTo[i]</label>
+			<label kind="comments" x="416" y="-127">async 
+(DST postbox)</label>
+			<nail x="408" y="-136"/>
+			<nail x="408" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id23"/>
+			<target ref="id24"/>
+			<label kind="select" x="280" y="-85">i:ep_t,
+j:po_t</label>
+			<label kind="guard" x="280" y="-51">owner[i]==id</label>
+			<label kind="assignment" x="279" y="-34">owner[i]=j</label>
+			<label kind="comments" x="280" y="-127">async 
+(PO postbox)</label>
+			<nail x="272" y="-136"/>
+			<nail x="272" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id24"/>
+			<target ref="id25"/>
+			<label kind="guard" x="238" y="76">!RECCURRING</label>
+			<label kind="synchronisation" x="238" y="93">exitCast[id]!</label>
+			<nail x="204" y="68"/>
+		</transition>
+		<transition>
+			<source ref="id23"/>
+			<target ref="id24"/>
+			<label kind="select" x="7" y="-85">i:ep_t,
+j:po_t</label>
+			<label kind="guard" x="8" y="-51">owner[i]==id</label>
+			<label kind="synchronisation" x="8" y="-34">postSnd[j]!</label>
+			<label kind="assignment" x="8" y="-17">owner[i]=j</label>
+			<label kind="comments" x="8" y="-127">sync 
+(PO)</label>
+			<nail x="-1" y="-136"/>
+			<nail x="-1" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id22"/>
+			<target ref="id23"/>
+			<label kind="synchronisation" x="34" y="-195">enterCast[id]?</label>
+			<nail x="204" y="-170"/>
+		</transition>
+	</template>
+	<template>
+		<name>Voter__handout</name>
+		<parameter>v_t id</parameter>
+		<declaration>const int RECCURRING = 0;</declaration>
+		<location id="id26" x="221" y="-153">
+		</location>
+		<location id="id27" x="136" y="0">
+		</location>
+		<location id="id28" x="306" y="0">
+		</location>
+		<location id="id29" x="221" y="153">
+		</location>
+		<init ref="id26"/>
+		<transition>
+			<source ref="id27"/>
+			<target ref="id28"/>
+			<label kind="select" x="178" y="-110">i:ep_t,
+j:addr_t</label>
+			<label kind="guard" x="178" y="-77">owner[i]==id</label>
+			<label kind="assignment" x="178" y="-60">owner[i]=j</label>
+			<label kind="comments" x="178" y="-34">async</label>
+			<nail x="170" y="-43"/>
+			<nail x="272" y="-43"/>
+		</transition>
+		<transition>
+			<source ref="id28"/>
+			<target ref="id26"/>
+			<label kind="guard" x="238" y="-195">RECCURRING</label>
+			<label kind="synchronisation" x="238" y="-178">exitHandout[id]!</label>
+			<nail x="306" y="-153"/>
+		</transition>
+		<transition>
+			<source ref="id27"/>
+			<target ref="id28"/>
+			<label kind="select" x="178" y="43">i:ep_t,
+j:aid_t</label>
+			<label kind="guard" x="178" y="77">owner[i]==id</label>
+			<label kind="synchronisation" x="178" y="94">pass[j]!</label>
+			<label kind="assignment" x="178" y="111">owner[i]=j</label>
+			<label kind="comments" x="178" y="17">sync</label>
+			<nail x="170" y="43"/>
+			<nail x="272" y="43"/>
+		</transition>
+		<transition>
+			<source ref="id28"/>
+			<target ref="id29"/>
+			<label kind="guard" x="238" y="161">!RECCURRING</label>
+			<label kind="synchronisation" x="238" y="178">exitHandout[id]!</label>
+			<nail x="306" y="153"/>
+		</transition>
+		<transition>
+			<source ref="id26"/>
+			<target ref="id27"/>
+			<label kind="synchronisation" x="76" y="-178">enterHandout[id]?</label>
+			<nail x="136" y="-153"/>
+		</transition>
+	</template>
+	<template>
+		<name>Authority__intention</name>
+		<parameter>a_t id</parameter>
+		<location id="id30" x="0" y="0">
+		</location>
+		<init ref="id30"/>
+		<transition>
+			<source ref="id30"/>
+			<target ref="id30"/>
+			<label kind="select" x="9" y="-102">i:if_t</label>
+			<label kind="guard" x="9" y="-85">owner[i]==addrOf[id]</label>
+			<label kind="assignment" x="8" y="-68">owner[i]=id</label>
+			<label kind="comments" x="-85" y="-68">async
+(postbox)</label>
+			<nail x="0" y="-102"/>
+			<nail x="-102" y="-102"/>
+			<nail x="-102" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id30"/>
+			<target ref="id30"/>
+			<label kind="synchronisation" x="-102" y="110">postRcv[id]?</label>
+			<label kind="comments" x="-85" y="34">sync
+(with PO)</label>
+			<nail x="0" y="102"/>
+			<nail x="-102" y="102"/>
+			<nail x="-103" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id30"/>
+			<target ref="id30"/>
+			<label kind="select" x="17" y="110">i: v_t</label>
+			<label kind="synchronisation" x="17" y="127">declare[i][id]?</label>
+			<label kind="comments" x="25" y="34">sync
+(with V)</label>
+			<nail x="0" y="102"/>
+			<nail x="102" y="102"/>
+			<nail x="102" y="0"/>
+		</transition>
+	</template>
+	<template>
+		<name>Authority__prepare</name>
+		<parameter>a_t id</parameter>
+		<location id="id31" x="136" y="0">
+		</location>
+		<init ref="id31"/>
+		<transition>
+			<source ref="id31"/>
+			<target ref="id31"/>
+			<label kind="select" x="314" y="34">i:if_t</label>
+			<label kind="guard" x="314" y="51">if_chk[i]==0</label>
+			<label kind="synchronisation" x="314" y="68">info[id][i]?</label>
+			<label kind="assignment" x="314" y="85">if_chk[i]=1,
+dqueue[sh[0]]=(sh[0]&gt;0 &amp;&amp; eligible[sh[0]] &amp;&amp; !dispatched[sh[0]] &amp;&amp; sh[2]==id) ? sh[1] : 0,
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+			<label kind="comments" x="170" y="59">for valid IF
+enqueue 
+delivery of EP</label>
+			<nail x="136" y="170"/>
+			<nail x="306" y="170"/>
+			<nail x="306" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id31"/>
+			<target ref="id31"/>
+			<label kind="select" x="35" y="-76">i:ep_t</label>
+			<label kind="guard" x="35" y="-59">owner[i]==0</label>
+			<label kind="assignment" x="34" y="-42">owner[i]=id,
+ep_stmp[i]=0</label>
+			<label kind="comments" x="51" y="51">invalid EP</label>
+			<nail x="136" y="102"/>
+			<nail x="34" y="102"/>
+			<nail x="34" y="0"/>
+		</transition>
+	</template>
+	<template>
+		<name>Authority__distribute</name>
+		<parameter>a_t id</parameter>
+		<location id="id32" x="-68" y="-34">
+		</location>
+		<init ref="id32"/>
+		<transition>
+			<source ref="id32"/>
+			<target ref="id32"/>
+			<label kind="select" x="-59" y="-221">i:ep_t,
+j:v_t,
+k:po_t</label>
+			<label kind="guard" x="-59" y="-170">owner[i]==id &amp;&amp;
+dqueue[j]!=0 &amp;&amp;
+dqueue[j]!=addrOf[id]</label>
+			<label kind="synchronisation" x="-59" y="-119">postSnd[k]!</label>
+			<label kind="assignment" x="-59" y="-102">owner[i]=k,
+dispatched[j]=1,
+dqueue[j]=0</label>
+			<label kind="comments" x="-153" y="-102">delegate 
+delivery</label>
+			<nail x="-170" y="-34"/>
+			<nail x="-170" y="-136"/>
+			<nail x="-68" y="-136"/>
+		</transition>
+		<transition>
+			<source ref="id32"/>
+			<target ref="id32"/>
+			<label kind="select" x="-59" y="-17">i:ep_t,
+j:v_t</label>
+			<label kind="guard" x="-59" y="17">owner[i]==id &amp;&amp;
+dqueue[j]==addrOf[id]</label>
+			<label kind="synchronisation" x="-59" y="51">collect[j][id]?</label>
+			<label kind="assignment" x="-59" y="68">owner[i]=j,
+dispatched[j]=1,
+dqueue[j]=0</label>
+			<label kind="comments" x="-153" y="0">in-person
+collection</label>
+			<nail x="-170" y="-34"/>
+			<nail x="-170" y="68"/>
+			<nail x="-68" y="68"/>
+		</transition>
+	</template>
+	<template>
+		<name>Authority__aggregate</name>
+		<parameter>a_t id</parameter>
+		<location id="id33" x="0" y="0">
+		</location>
+		<init ref="id33"/>
+		<transition>
+			<source ref="id33"/>
+			<target ref="id33"/>
+			<label kind="select" x="-102" y="110">i:v_t</label>
+			<label kind="guard" x="-102" y="127">eligible[i]==1 &amp;&amp; 
+recorded[i]==0 &amp;&amp;
+dispatched[i]==1</label>
+			<label kind="synchronisation" x="-102" y="178">cast[i][id]?</label>
+			<nail x="-102" y="0"/>
+			<nail x="-102" y="102"/>
+			<nail x="0" y="102"/>
+		</transition>
+		<transition>
+			<source ref="id33"/>
+			<target ref="id33"/>
+			<label kind="select" x="0" y="-161">i:ep_t</label>
+			<label kind="guard" x="0" y="-144">owner[i]==addrOf[id]</label>
+			<label kind="assignment" x="-1" y="-127">owner[i]=id</label>
+			<nail x="102" y="0"/>
+			<nail x="102" y="-102"/>
+			<nail x="0" y="-102"/>
+		</transition>
+	</template>
+	<template>
+		<name>Authority__record</name>
+		<parameter>a_t id</parameter>
+		<location id="id34" x="-340" y="-204">
+		</location>
+		<init ref="id34"/>
+		<transition>
+			<source ref="id34"/>
+			<target ref="id34"/>
+			<label kind="select" x="-229" y="-102">i:ep_t</label>
+			<label kind="guard" x="-229" y="-85">openBE[i]==1 &amp;&amp;
+procBE[i]==0</label>
+			<label kind="synchronisation" x="-229" y="-51">info[id][i]?</label>
+			<label kind="assignment" x="-229" y="-34">procBE[i]=1,
+tally[sh[2]] = (sh[2]&gt;0) ? (tally[sh[2]]+sh[0]) : tally[sh[2]],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+			<label kind="comments" x="-297" y="-161">4</label>
+			<nail x="-340" y="-102"/>
+			<nail x="-238" y="-102"/>
+			<nail x="-238" y="-204"/>
+		</transition>
+		<transition>
+			<source ref="id34"/>
+			<target ref="id34"/>
+			<label kind="select" x="-229" y="-374">i:ep_t</label>
+			<label kind="guard" x="-229" y="-357">openRE[i]==1 &amp;&amp; 
+procRE[i]==0</label>
+			<label kind="synchronisation" x="-229" y="-323">info[id][i]?</label>
+			<label kind="assignment" x="-229" y="-306">procRE[i]=1,
+inBox[i]=eligible[sh[1]] &amp;&amp; !recorded[sh[1]],
+(sh[1]&gt;0) ? (recorded[sh[1]]=1) : 0,
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+			<label kind="comments" x="-297" y="-263">2</label>
+			<nail x="-340" y="-306"/>
+			<nail x="-238" y="-306"/>
+			<nail x="-238" y="-204"/>
+		</transition>
+		<transition>
+			<source ref="id34"/>
+			<target ref="id34"/>
+			<label kind="select" x="-544" y="-102">i:ep_t</label>
+			<label kind="guard" x="-544" y="-85">inBox[i]==1 &amp;&amp;
+openBE[i]==0</label>
+			<label kind="synchronisation" x="-543" y="-51">sealOp[id][i][1]!</label>
+			<label kind="assignment" x="-543" y="-34">openBE[i]=1,
+inBox[i]=0</label>
+			<label kind="comments" x="-399" y="-161">3</label>
+			<nail x="-340" y="-102"/>
+			<nail x="-442" y="-102"/>
+			<nail x="-442" y="-204"/>
+		</transition>
+		<transition>
+			<source ref="id34"/>
+			<target ref="id34"/>
+			<label kind="select" x="-545" y="-374">i:ep_t</label>
+			<label kind="guard" x="-544" y="-357">openRE[i]==0</label>
+			<label kind="synchronisation" x="-544" y="-340">sealOp[id][i][1]!</label>
+			<label kind="assignment" x="-544" y="-323">openRE[i]=1</label>
+			<label kind="comments" x="-399" y="-263">1</label>
+			<nail x="-340" y="-306"/>
+			<nail x="-442" y="-306"/>
+			<nail x="-442" y="-204"/>
+		</transition>
+	</template>
+	<template>
+		<name>PostOffice__accept</name>
+		<parameter>po_t id</parameter>
+		<location id="id35" x="0" y="0">
+		</location>
+		<init ref="id35"/>
+		<transition>
+			<source ref="id35"/>
+			<target ref="id35"/>
+			<label kind="select" x="0" y="110">i:oid_t</label>
+			<label kind="guard" x="0" y="127">owner[i]==addrOf[id]</label>
+			<label kind="assignment" x="-1" y="144">owner[i]=id</label>
+			<label kind="comments" x="17" y="34">async
+postbox</label>
+			<nail x="0" y="102"/>
+			<nail x="102" y="102"/>
+			<nail x="102" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id35"/>
+			<target ref="id35"/>
+			<label kind="synchronisation" x="-102" y="-127">postSnd[id]?</label>
+			<label kind="comments" x="-85" y="-68">sync
+hand in</label>
+			<nail x="0" y="-102"/>
+			<nail x="-102" y="-102"/>
+			<nail x="-102" y="0"/>
+		</transition>
+	</template>
+	<template>
+		<name>PostOffice__deliver</name>
+		<parameter>po_t id</parameter>
+		<location id="id36" x="-34" y="0">
+		</location>
+		<init ref="id36"/>
+		<transition>
+			<source ref="id36"/>
+			<target ref="id36"/>
+			<label kind="select" x="42" y="-102">i:oid_t</label>
+			<label kind="guard" x="42" y="-85">owner[i]==id &amp;&amp; 
+envTo[i]&gt;0</label>
+			<label kind="assignment" x="42" y="-51">owner[i]=addrOf[envTo[i]],
+envTo[i]=0</label>
+			<nail x="34" y="0"/>
+			<nail x="34" y="-68"/>
+			<nail x="-34" y="-68"/>
+		</transition>
+		<transition>
+			<source ref="id36"/>
+			<target ref="id36"/>
+			<label kind="select" x="42" y="8">i:oid_t</label>
+			<label kind="guard" x="42" y="25">owner[i]==id &amp;&amp; 
+envTo[i]&gt;0</label>
+			<label kind="synchronisation" x="42" y="59">postRcv[envTo[i]]!</label>
+			<label kind="assignment" x="42" y="76">owner[i]=envTo[i],
+envTo[i]=0</label>
+			<label kind="comments" x="-59" y="76">hand in</label>
+			<nail x="34" y="0"/>
+			<nail x="34" y="68"/>
+			<nail x="-34" y="68"/>
+		</transition>
+		<transition>
+			<source ref="id36"/>
+			<target ref="id36"/>
+			<label kind="select" x="-236" y="-102">i:oid_t</label>
+			<label kind="guard" x="-237" y="-85">owner[i]==id &amp;&amp; 
+envTo[i]&lt;0</label>
+			<label kind="assignment" x="-238" y="-51">owner[i]=envTo[i],
+envTo[i]=0</label>
+			<label kind="comments" x="-93" y="-93">leave in postbox</label>
+			<nail x="-102" y="0"/>
+			<nail x="-102" y="-68"/>
+			<nail x="-34" y="-68"/>
+		</transition>
+	</template>
+	<template>
+		<name>PostOffice__alter</name>
+		<parameter>po_t id</parameter>
+		<location id="id37" x="0" y="0">
+		</location>
+		<init ref="id37"/>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id37"/>
+			<label kind="select" x="17" y="34">i:ep_t,
+j:c_tx</label>
+			<label kind="synchronisation" x="17" y="68">fill[id][i]!</label>
+			<label kind="assignment" x="17" y="85">sh[2] = j</label>
+			<nail x="0" y="136"/>
+			<nail x="136" y="136"/>
+			<nail x="136" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id37"/>
+			<label kind="select" x="-119" y="34">i:if_t,
+j:addr_tx</label>
+			<label kind="synchronisation" x="-119" y="68">fill[id][i]!</label>
+			<label kind="assignment" x="-119" y="85">sh[1]=j</label>
+			<nail x="0" y="136"/>
+			<nail x="-136" y="136"/>
+			<nail x="-136" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id37"/>
+			<label kind="select" x="17" y="-85">i:ep_t</label>
+			<label kind="synchronisation" x="16" y="-68">sealOp[id][i][2]!</label>
+			<label kind="comments" x="17" y="-127">seal</label>
+			<nail x="0" y="-136"/>
+			<nail x="136" y="-136"/>
+			<nail x="136" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id37"/>
+			<target ref="id37"/>
+			<label kind="select" x="-119" y="-102">i:ep_t,
+j:int[0,1]</label>
+			<label kind="synchronisation" x="-120" y="-68">sealOp[id][i][j]!</label>
+			<label kind="comments" x="-119" y="-127">un-seal</label>
+			<nail x="0" y="-136"/>
+			<nail x="-136" y="-136"/>
+			<nail x="-136" y="0"/>
+		</transition>
+	</template>
+	<template>
+		<name>IntentionForm</name>
+		<parameter>if_t id</parameter>
+		<location id="id38" x="0" y="0">
+		</location>
+		<init ref="id38"/>
+		<transition>
+			<source ref="id38"/>
+			<target ref="id38"/>
+			<label kind="select" x="17" y="8">i:aid_t</label>
+			<label kind="guard" x="17" y="25">owner[id]==0 || owner[id]==i</label>
+			<label kind="synchronisation" x="17" y="42">fill[i][id]?</label>
+			<label kind="assignment" x="17" y="59">owner[id]=i,
+if_voter[id]=sh[0]==0 ? if_voter[id] : sh[0],
+if_addr[id]=sh[1]==0 ? if_addr[id] : sh[1],
+if_gov[id]=sh[2]==0 ? if_gov[id] : sh[2],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+			<nail x="-68" y="0"/>
+			<nail x="-68" y="170"/>
+			<nail x="0" y="170"/>
+		</transition>
+		<transition>
+			<source ref="id38"/>
+			<target ref="id38"/>
+			<label kind="select" x="17" y="-110">i:aid_t</label>
+			<label kind="guard" x="17" y="-93">owner[id]==i</label>
+			<label kind="synchronisation" x="17" y="-76">info[i][id]!</label>
+			<label kind="assignment" x="17" y="-59">sh[0] = if_voter[id],
+sh[1] = if_addr[id],
+sh[2] = if_gov[id]</label>
+			<nail x="-68" y="0"/>
+			<nail x="-68" y="-102"/>
+			<nail x="0" y="-102"/>
+		</transition>
+	</template>
+	<template>
+		<name>ElectionPackage</name>
+		<parameter>ep_t id</parameter>
+		<declaration>int[0,1] rintact=1, bintact=1;</declaration>
+		<location id="id39" x="-272" y="-102">
+			<name x="-263" y="-93">nseal</name>
+		</location>
+		<location id="id40" x="0" y="170">
+			<name x="8" y="178">rseal</name>
+		</location>
+		<location id="id41" x="-136" y="34">
+			<name x="-127" y="42">bseal</name>
+		</location>
+		<init ref="id39"/>
+		<transition>
+			<source ref="id40"/>
+			<target ref="id40"/>
+			<label kind="select" x="76" y="170">i:aid_t</label>
+			<label kind="guard" x="76" y="187">owner[id]==i</label>
+			<label kind="synchronisation" x="76" y="204">info[i][id]!</label>
+			<label kind="assignment" x="76" y="221">sh[0]=-1,
+sh[1]=-1,
+sh[2]=-2</label>
+			<nail x="0" y="238"/>
+			<nail x="68" y="238"/>
+			<nail x="68" y="170"/>
+		</transition>
+		<transition>
+			<source ref="id41"/>
+			<target ref="id41"/>
+			<label kind="select" x="-297" y="102">i: aid_t</label>
+			<label kind="guard" x="-297" y="119">owner[id]==i</label>
+			<label kind="synchronisation" x="-297" y="136">info[i][id]!</label>
+			<label kind="assignment" x="-297" y="153">sh[0] = -1,
+sh[1] = ep_sgn[id],
+sh[2] = -1</label>
+			<nail x="-204" y="34"/>
+			<nail x="-204" y="102"/>
+			<nail x="-136" y="102"/>
+		</transition>
+		<transition>
+			<source ref="id41"/>
+			<target ref="id41"/>
+			<label kind="select" x="-59" y="-85">i: aid_t</label>
+			<label kind="guard" x="-59" y="-68">owner[id]==i</label>
+			<label kind="synchronisation" x="-59" y="-51">fill[i][id]?</label>
+			<label kind="assignment" x="-59" y="-34">ep_sgn[id] = ep_sgn[id] ? ep_sgn[id] : sh[1],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+			<nail x="-68" y="34"/>
+			<nail x="-68" y="-34"/>
+			<nail x="-136" y="-34"/>
+		</transition>
+		<transition>
+			<source ref="id39"/>
+			<target ref="id39"/>
+			<label kind="select" x="-484" y="-136">i: aid_t</label>
+			<label kind="guard" x="-484" y="-119">owner[id]==i</label>
+			<label kind="synchronisation" x="-484" y="-102">info[i][id]!</label>
+			<label kind="assignment" x="-484" y="-85">sh[0] = ep_stmp[id],
+sh[1] = ep_sgn[id],
+sh[2] = ep_x[id]</label>
+			<nail x="-340" y="-102"/>
+			<nail x="-340" y="-34"/>
+			<nail x="-272" y="-34"/>
+		</transition>
+		<transition>
+			<source ref="id39"/>
+			<target ref="id39"/>
+			<label kind="select" x="-340" y="-263">i: aid_t</label>
+			<label kind="guard" x="-340" y="-246">owner[id]==i</label>
+			<label kind="synchronisation" x="-340" y="-229">fill[i][id]?</label>
+			<label kind="assignment" x="-340" y="-212">ep_sgn[id] = ep_sgn[id] ? ep_sgn[id] : sh[1],
+ep_x[id] =  (ep_x[id]&gt;0 || ep_x[id]==-1) ? -1 : sh[2],
+sh[0]=0,
+sh[1]=0,
+sh[2]=0</label>
+			<nail x="-204" y="-102"/>
+			<nail x="-204" y="-170"/>
+			<nail x="-272" y="-170"/>
+		</transition>
+		<transition>
+			<source ref="id41"/>
+			<target ref="id39"/>
+			<label kind="select" x="-374" y="-9">i: aid_t,
+rip:int[0,1]</label>
+			<label kind="guard" x="-374" y="25">owner[id]==i</label>
+			<label kind="synchronisation" x="-374" y="42">sealOp[i][id][rip]?</label>
+			<label kind="assignment" x="-374" y="59">bintact=!rip</label>
+			<nail x="-272" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id40"/>
+			<target ref="id41"/>
+			<label kind="select" x="-136" y="178">i: aid_t,
+rip:int[0,1]</label>
+			<label kind="guard" x="-136" y="212">owner[id]==i</label>
+			<label kind="synchronisation" x="-136" y="229">sealOp[i][id][rip]?</label>
+			<label kind="assignment" x="-136" y="246">rintact=!rip</label>
+			<nail x="-136" y="170"/>
+		</transition>
+		<transition>
+			<source ref="id41"/>
+			<target ref="id40"/>
+			<label kind="select" x="8" y="34">i: aid_t</label>
+			<label kind="guard" x="8" y="51">rintact &amp;&amp;
+owner[id]==i</label>
+			<label kind="synchronisation" x="8" y="85">sealOp[i][id][2]?</label>
+			<nail x="0" y="34"/>
+		</transition>
+		<transition>
+			<source ref="id39"/>
+			<target ref="id41"/>
+			<label kind="select" x="-136" y="-170">i: aid_t</label>
+			<label kind="guard" x="-136" y="-153">bintact &amp;&amp;
+owner[id]==i</label>
+			<label kind="synchronisation" x="-136" y="-119">sealOp[i][id][2]?</label>
+			<nail x="-136" y="-102"/>
+		</transition>
+	</template>
+	<system>system Voter, Voter__intention, Authority__intention, PostOffice__accept, PostOffice__deliver, IntentionForm,
+       Voter__acquire, Voter__handout, Authority__prepare, Authority__distribute, ElectionPackage, PostOffice__alter,
+       Voter__fill, Voter__cast, Authority__aggregate, Authority__record;
+
+</system>
+	<queries>
+		<query>
+			<formula>E&lt;&gt;tally[1]&gt;0</formula>
+			<comment></comment>
+		</query>
+		<query>
+			<formula>A[] ElectionPackage.rseal imply ElectionPackage.rintact</formula>
+			<comment>Sanity check</comment>
+		</query>
+		<query>
+			<formula>A[] ElectionPackage.bseal imply ElectionPackage.bintact</formula>
+			<comment>Sanity check</comment>
+		</query>
+		<query>
+			<formula>A[]0==sum(i:int[1,NC])tally[i]</formula>
+			<comment></comment>
+		</query>
+	</queries>
+</nta>
